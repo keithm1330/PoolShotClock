@@ -27,8 +27,26 @@
       text-shadow: 0 0 15px rgba(0,0,0,0.6);
     }
 
-    #timer {
-      font-size: clamp(10rem, 35vw, 20rem); /* BIGGER than before */
+    .label {
+      font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-weight: 600;
+      color: #ddd;
+      margin-bottom: 0.3rem;
+    }
+
+    /* Game clock */
+    #game-timer {
+      font-size: clamp(2rem, 6vw, 4rem);
+      font-weight: bold;
+      margin-bottom: 2rem;
+      text-shadow: 0 0 10px rgba(0,0,0,0.7);
+    }
+
+    /* Shot clock big */
+    #shot-timer {
+      font-size: clamp(10rem, 35vw, 20rem);
       font-weight: bold;
       letter-spacing: 4px;
       margin-bottom: 2rem;
@@ -63,29 +81,63 @@
     .start { background: #28a745; }
     .stop  { background: #dc3545; }
     .reset { background: #007bff; }
+    .reset-game { background: #ffc107; color: #000; }
   </style>
 </head>
 <body>
 <h1>RiverValley Pool Team Shot Clock</h1>
-<div id="timer">60</div>
+
+<!-- Game clock -->
+<div class="label">Game Clock</div>
+<div id="game-timer">20:00</div>
+
+<!-- Shot clock -->
+<div class="label">Shot Clock</div>
+<div id="shot-timer">60</div>
+
 <div class="buttons">
     <button class="start" onclick="start()">Start</button>
     <button class="stop" onclick="stop()">Stop</button>
-    <button class="reset" onclick="reset()">Reset</button>
+    <button class="reset" onclick="resetShot()">Reset Shot</button>
+    <button class="reset-game" onclick="resetGame()">Reset Game</button>
 </div>
 
 <script>
-  const timer = document.getElementById("timer");
-  const evtSource = new EventSource("/clock/stream");
+    const shotTimer = document.getElementById("shot-timer");
+    const gameTimer = document.getElementById("game-timer");
 
-  evtSource.onmessage = e => {
-    const data = JSON.parse(e.data);
-    timer.textContent = data.timeLeft;
-  };
+    // SSE stream from backend
+    const evtSource = new EventSource("/clock/stream");
 
-  function start()  { fetch("/clock/start", { method: "POST" }) }
-  function stop()   { fetch("/clock/stop",  { method: "POST" }) }
-  function reset()  { fetch("/clock/reset", { method: "POST" }) }
-</script>
+    evtSource.onmessage = e => {
+      const data = JSON.parse(e.data);
+
+      // --- Shot clock ---
+      shotTimer.textContent = data.shotTimeLeft;
+
+      // --- Game clock ---
+      const mins = Math.floor(data.gameTimeLeft / 60);
+      const secs = data.gameTimeLeft % 60;
+      gameTimer.textContent =
+        `${mins.toString().padStart(2,"0")}:${secs.toString().padStart(2,"0")}`;
+    };
+
+    // API calls
+    function start() {
+      fetch("/clock/start", { method: "POST" });
+    }
+
+    function stop() {
+      fetch("/clock/stop", { method: "POST" });
+    }
+
+    function resetShot() {
+      fetch("/clock/reset", { method: "POST" });
+    }
+
+    function resetGame() {
+      fetch("/clock/game/reset", { method: "POST" });
+    }
+  </script>
 </body>
 </html>
