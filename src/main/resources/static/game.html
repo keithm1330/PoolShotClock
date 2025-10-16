@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pool Shot Clock</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #fff;
+  text-align: center;
+}
+
+h1 {
+  font-size: clamp(1.5rem, 5vw, 3rem);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-weight: 700;
+  text-shadow: 0 0 15px rgba(0,0,0,0.6);
+}
+
+.label {
+  font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 600;
+  color: #ddd;
+  margin-bottom: 0.3rem;
+}
+
+#game-timer {
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: bold;
+  margin-bottom: 2rem;
+  text-shadow: 0 0 10px rgba(0,0,0,0.7);
+}
+
+#shot-timer {
+  font-size: clamp(10rem, 35vw, 20rem);
+  font-weight: bold;
+  letter-spacing: 4px;
+  margin-bottom: 2rem;
+  text-shadow: 0 0 30px rgba(0,0,0,0.8);
+}
+
+.buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+button {
+  font-size: 1.5rem;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: white;
+  font-weight: bold;
+  flex: 1 1 30%;
+  max-width: 200px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+button:active { transform: scale(0.95); opacity: 0.9; }
+
+.start { background: #28a745; }
+.stop  { background: #dc3545; }
+.reset { background: #007bff; }
+.reset-game { background: #ffc107; color: #000; }
+.delete { background: #ff4d4d; }
+
+.deleted-msg {
+  font-size: 2rem;
+  color: #ff4d4d;
+  text-shadow: 0 0 10px rgba(0,0,0,0.7);
+  margin-top: 2rem;
+}
+</style>
+</head>
+<body>
+<h1 id="game-title">RiverValley Pool Team Shot Clock</h1>
+
+<div class="label">Game Clock</div>
+<div id="game-timer">20:00</div>
+
+<div class="label">Shot Clock</div>
+<div id="shot-timer">60</div>
+
+<div class="buttons" id="control-buttons">
+    <button class="start" onclick="start()">Start</button>
+    <button class="stop" onclick="stop()">Stop</button>
+    <button class="reset" onclick="resetShot()">Reset Shot</button>
+    <button class="reset-game" onclick="resetGame()">Reset Game</button>
+    <button class="delete" onclick="deleteGame()">Delete Game</button>
+</div>
+
+<div id="deleted-msg" class="deleted-msg" style="display:none;">Game Deleted</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const gameId = params.get("gameId") || "default";
+const key = params.get("key") || null;
+const MASTER_KEY = "MASTER123"; // master key
+
+const shotTimer = document.getElementById("shot-timer");
+const gameTimer = document.getElementById("game-timer");
+const controls = document.getElementById("control-buttons");
+const deletedMsg = document.getElementById("deleted-msg");
+const gameTitle = document.getElementById("game-title");
+gameTitle.textContent = `${gameId} - RiverValley Pool Team Shot Clock`;
+
+if (!key) controls.style.display = "none";
+
+let evtSource = new EventSource(`/clock/${gameId}/stream`);
+let deleted = false;
+
+evtSource.onmessage = e => {
+  const data = JSON.parse(e.data);
+  if (!data) return;
+
+  if (data.deleted && !deleted) {
+    deleted = true;
+    evtSource.close();
+
+    window.location.href = "index.html"; // redirect all viewers
+    return;
+  }
+
+  shotTimer.textContent = data.shotTimeLeft;
+  const mins = Math.floor(data.gameTimeLeft / 60);
+  const secs = data.gameTimeLeft % 60;
+  gameTimer.textContent = `${mins.toString().padStart(2,"0")}:${secs.toString().padStart(2,"0")}`;
+};
+
+function start() { if (!key) return; fetch(`/clock/${gameId}/start?key=${key}`, { method: "POST" }); }
+function stop() { if (!key) return; fetch(`/clock/${gameId}/stop?key=${key}`, { method: "POST" }); }
+function resetShot() { if (!key) return; fetch(`/clock/${gameId}/reset?key=${key}`, { method: "POST" }); }
+function resetGame() { if (!key) return; fetch(`/clock/${gameId}/game/reset?key=${key}`, { method: "POST" }); }
+
+function deleteGame() {
+  let useKey = key || prompt("Enter control key or master key to delete this game:");
+  if (!useKey) return;
+
+  fetch(`/clock/${gameId}/delete?key=${encodeURIComponent(useKey)}`, { method: "POST" })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        deletedMsg.style.display = "block";
+        controls.style.display = "none";
+        evtSource.close();
+        window.location.href = "index.html";
+      } else {
+        alert(data.message);
+      }
+    });
+}
+</script>
+</body>
+</html>

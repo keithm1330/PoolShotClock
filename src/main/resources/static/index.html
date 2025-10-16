@@ -1,143 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Pool Shot Clock</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: #fff;
-      text-align: center;
-    }
+  <meta charset="UTF-8">
+  <title>Pool Shot Clock Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #0f2027;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+  }
 
-    h1 {
-      font-size: clamp(1.5rem, 5vw, 3rem);
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 3px;
-      font-weight: 700;
-      text-shadow: 0 0 15px rgba(0,0,0,0.6);
-    }
+  h1 { text-align: center; margin-bottom: 2rem; }
 
-    .label {
-      font-size: clamp(0.9rem, 2.5vw, 1.2rem);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      font-weight: 600;
-      color: #ddd;
-      margin-bottom: 0.3rem;
-    }
-
-    /* Game clock */
-    #game-timer {
-      font-size: clamp(2rem, 6vw, 4rem);
-      font-weight: bold;
-      margin-bottom: 2rem;
-      text-shadow: 0 0 10px rgba(0,0,0,0.7);
-    }
-
-    /* Shot clock big */
-    #shot-timer {
-      font-size: clamp(10rem, 35vw, 20rem);
-      font-weight: bold;
-      letter-spacing: 4px;
-      margin-bottom: 2rem;
-      text-shadow: 0 0 30px rgba(0,0,0,0.8);
-    }
-
-    .buttons {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    button {
-      font-size: 1.5rem;
-      padding: 1rem 2rem;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      color: white;
-      font-weight: bold;
-      flex: 1 1 30%;
-      max-width: 200px;
-      transition: transform 0.2s ease, opacity 0.2s ease;
-    }
-
-    button:active {
-      transform: scale(0.95);
-      opacity: 0.9;
-    }
-
-    .start { background: #28a745; }
-    .stop  { background: #dc3545; }
-    .reset { background: #007bff; }
-    .reset-game { background: #ffc107; color: #000; }
-  </style>
+  .game-list { display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 600px; }
+  .game-item { display: flex; justify-content: space-between; align-items: center; background: #203a43; padding: 1rem; border-radius: 8px; }
+  .game-item button { margin-left: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .view-btn { background: #28a745; color: white; }
+  .control-btn { background: #007bff; color: white; }
+  .delete-btn { background: #dc3545; color: white; }
+  .create-form { margin-bottom: 2rem; display: flex; gap: 0.5rem; }
+  input[type=text] { padding: 0.5rem; border-radius: 6px; border: none; flex: 1; }
+  button.create { background: #ffc107; color: #000; font-weight: bold; }
+</style>
 </head>
 <body>
-<h1>RiverValley Pool Team Shot Clock</h1>
 
-<!-- Game clock -->
-<div class="label">Game Clock</div>
-<div id="game-timer">20:00</div>
+<h1>Pool Shot Clock Dashboard</h1>
 
-<!-- Shot clock -->
-<div class="label">Shot Clock</div>
-<div id="shot-timer">60</div>
+<!-- Create Game Form -->
+<form class="create-form" id="createForm">
+  <input type="text" id="newGameId" placeholder="New Game ID" required>
+  <button type="submit" class="create">Create Game</button>
+</form>
 
-<div class="buttons">
-    <button class="start" onclick="start()">Start</button>
-    <button class="stop" onclick="stop()">Stop</button>
-    <button class="reset" onclick="resetShot()">Reset Shot</button>
-    <button class="reset-game" onclick="resetGame()">Reset Game</button>
-</div>
+<!-- Game List -->
+<div class="game-list" id="gameList"></div>
 
 <script>
-    const shotTimer = document.getElementById("shot-timer");
-    const gameTimer = document.getElementById("game-timer");
+const MASTER_KEY = "MASTER123"; // Your master key
 
-    // SSE stream from backend
-    const evtSource = new EventSource("/clock/stream");
+function fetchGames() {
+  fetch('/clock/list')
+    .then(res => res.json())
+    .then(games => {
+      const list = document.getElementById('gameList');
+      list.innerHTML = '';
+      games.forEach(game => {
+        const div = document.createElement('div');
+        div.className = 'game-item';
+        div.innerHTML = `
+          <span>${game.gameId}</span>
+          <div>
+            <button class="view-btn" onclick="window.open('game.html?gameId=${game.gameId}', '_blank')">View</button>
+            <button class="control-btn" onclick="controlGame('${game.gameId}')">Control</button>
+            <button class="delete-btn" onclick="deleteGame('${game.gameId}')">Delete</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    });
+}
 
-    evtSource.onmessage = e => {
-      const data = JSON.parse(e.data);
+// Prompt for control key to open control page
+function controlGame(gameId) {
+  const key = prompt("Enter control key for this game:");
+  if (!key) return;
+  window.open(`game.html?gameId=${gameId}&key=${key}`, '_blank');
+}
 
-      // --- Shot clock ---
-      shotTimer.textContent = data.shotTimeLeft;
+// Delete a game with control key or master key
+function deleteGame(gameId) {
+  const key = prompt("Enter control key or master key to delete this game:");
+  if (!key) return;
 
-      // --- Game clock ---
-      const mins = Math.floor(data.gameTimeLeft / 60);
-      const secs = data.gameTimeLeft % 60;
-      gameTimer.textContent =
-        `${mins.toString().padStart(2,"0")}:${secs.toString().padStart(2,"0")}`;
-    };
+  fetch(`/clock/${gameId}/delete?key=${encodeURIComponent(key)}`, { method: "POST" })
+    .then(res => res.json())
+    .then(data => {
+      alert(data.message);
+      fetchGames();
+    });
+}
 
-    // API calls
-    function start() {
-      fetch("/clock/start", { method: "POST" });
-    }
+// Create new game
+document.getElementById('createForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const gameId = document.getElementById('newGameId').value.trim();
+  if (!gameId) return;
 
-    function stop() {
-      fetch("/clock/stop", { method: "POST" });
-    }
+  fetch(`/clock/create?gameId=${encodeURIComponent(gameId)}`, { method: "POST" })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert(data.error);
+      } else {
+        // Auto-redirect creator to control page with key
+        window.location.href = `game.html?gameId=${data.gameId}&key=${data.key}`;
+      }
+    });
+});
 
-    function resetShot() {
-      fetch("/clock/reset", { method: "POST" });
-    }
+// Initial fetch of games
+fetchGames();
+</script>
 
-    function resetGame() {
-      fetch("/clock/game/reset", { method: "POST" });
-    }
-  </script>
 </body>
 </html>
